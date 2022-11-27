@@ -6,9 +6,9 @@
 #include <ESP32Tone.h>
 #include <ESP32PWM.h>
 #include <TinyGPSPlus.h>
-TinyGPSPlus gps;
+//TinyGPSPlus gps;
 #include <QMC5883LCompass.h>
-QMC5883LCompass compass;
+//QMC5883LCompass compass;
 
 
 
@@ -21,16 +21,17 @@ MyDuckClass::MyDuckClass(int pinPropellorSpeed, int pinPropellorDirection, int p
     //_angleOfHeading
     //wayPoints[10]
     //_spotLockLocation
-    Servo headBobbingServo;
-    Servo PropellorServo;
-    headBobbingServo.attach(_pinHB);
-    PropellorServo.attach(_pinHM);
+   // Servo headBobbingServo;
+   // Servo PropellorServo;
+    //headBobbingServo.attach(_pinHB);
+   // PropellorServo.attach(_pinHM);
 
 
 }   
 
 String MyDuckClass::calibrationOfMagnotometer(){
 //Used to calibrate heading (IMPORTANT)
+    Serial.println("Calibration");
     Servo PropellorServo;
     PropellorServo.attach(_pinHM);
     //Turn heading to face perpendicular to duck decoy
@@ -102,14 +103,14 @@ String MyDuckClass::calibrationOfMagnotometer(){
 
     }
 
-
+PropellorServo.detach();
 }
 
 
 //turn on propellor
 void MyDuckClass::turnOnProppellor(int propellorSpeed, int propellorDirection){
 // Turning on DC motor to have Propellor run 
-
+ Serial.println("Turn on prop");
 #define MOTOR_A_PWM propellorSpeed // Motor B PWM Speed
 #define MOTOR_A_DIR propellorDirection // Motor B Direction
 
@@ -124,13 +125,13 @@ void MyDuckClass::turnOnProppellor(int propellorSpeed, int propellorDirection){
 //Turn off propellor
 void MyDuckClass::turnOffProppellor(int propellorSpeed, int propellorDirection) {
     // Turning on DC motor to have Propellor run 
-
+ Serial.println("turn off prop");
 #define MOTOR_A_PWM propellorSpeed // Motor B PWM Speed
 #define MOTOR_A_DIR propellorDirection // Motor B Direction
 
 
     digitalWrite(MOTOR_A_DIR, LOW);
-    digitalWrite(MOTOR_A_PWM, LOW);
+    analogWrite(MOTOR_A_PWM, 255);
 
 
 
@@ -138,54 +139,94 @@ void MyDuckClass::turnOffProppellor(int propellorSpeed, int propellorDirection) 
 
 
 //Change heading of the propellor motor using the servo motor
-void MyDuckClass::movePropHeading(int angleOfHeading){
+void MyDuckClass::movePropHeading(Servo headingServo,double currentlat,double currentlong,double destinationlat,double destinationlong,TinyGPSPlus gps1,QMC5883LCompass compass1){
 //Set direction of Propellor
-    Servo headBobbingServo;
-    headBobbingServo.attach(_pinHM);
+ Serial.println("move prop heading");
+    double currentLocation[] = {currentlat, currentlong};
+    double destinationLocation[] = {destinationlat,destinationlong} ;
+    int angleOfHeading = 0;
+    int angleMag;
 
-  headBobbingServo.write(angleOfHeading);
+      //while((Serial2.available() > 0)) {
+      while(true) {
+      //Turn heading to face perpendicular to duck decoy
+      Serial.println("Getting GPS");   
+
+
+        if (gps1.encode(Serial2.read()))
+        {
+          if (gps1.location.isValid()){
+             currentLocation[0] = (gps1.location.lat());
+            currentLocation[1] = (gps1.location.lng());
+            //Serial.println(currentLocation[0]);
+            //Serial.println(currentLocation[1]);
+            //Serial.println(distanceToWaypoint(currentLocation,destinationLocation));
+              compass1.read();
+              //Angle of heading based on Magnotometer
+              angleMag = compass1 .getAzimuth();
+              
+             angleOfHeading = gps1.courseTo(gps1.location.lat(),gps1.location.lng(),44.14774,-93.99575);
+              headingServo.write(angleOfHeading-100);
+            Serial.println(angleOfHeading-100);
+            Serial.println(gps1.distanceBetween( gps1.location.lat(),gps1.location.lng(),44.14774,-93.99575));
+            //delay(1000);
+            }
+          }
+          
+          //if(distanceToWaypoint(currentLocation,destinationLocation) < 4){
+            //break;
+        //}
+      
+    
+}
+return;
 }
 
 void MyDuckClass::spotLock(float spotLockLocation[2]) {
 // Spot lock for duck
-    float *CL;
-    CL = currentLocation();
+    float CL;
+    CL =  1;
 
-    if (distanceToWaypoint(CL, spotLockLocation) > 4) {
-        float desiredAngle = angleToWaypoint(CL, spotLockLocation);
+    //if (distanceToWaypoint(CL, spotLockLocation) > 4) {
+        //float desiredAngle = angleToWaypoint(CL, spotLockLocation);
         //Fix angle once motor is mounted
-        movePropHeading(desiredAngle);
-    }
+      //  movePropHeading(desiredAngle);
+    //}
 
 
 }
 
-float * MyDuckClass::currentLocation(){
+void MyDuckClass::currentLocation(){
 //Get the current location of the duck
 
-    float Cordinates[2];
-
-    Serial2.begin(9600);
-    TinyGPSPlus gps;
-    if ((Serial2.available() > 0)) {
-        
-        if ((gps.encode(Serial2.read()))) {
-            if (gps.location.isValid()) {
-
-                Cordinates[0] = gps.location.lat();
+  //  float Cordinates[2];
+Serial.print("Getting GPS location");
+  //  TinyGPSPlus gps;
+//Serial2.print("Getting current location");
+//Serial2.begin(9600);
+    //if ((Serial2.available() > 0)) {
+        //Serial.print("gps available");
+        //if ((gps.encode(Serial2.read()))) {
+          //Serial.print("gps encode");
+            //if (gps.location.isValid()) {
+                //Serial.print("Gps location is valid");
+                //Cordinates[0] = gps.location.lat();
                 
-                Cordinates[1] = gps.location.lng();
+                //Cordinates[1] = gps.location.lng();
+               // Serial.print(Cordinates[0]);
+              //  Serial.print(Cordinates[1]);
+          
+                
+            //}
+            //else {
 
-            }
-            else {
+          //      Serial.print(F("INVALID"));
 
-                Serial.print(F("INVALID"));
+        //    }
+      //  }
 
-            }
-        }
-
-    }
-    return Cordinates;
+    //}
+    //return ;
 }
 
 float MyDuckClass::GetDuckHeading() {
@@ -217,7 +258,7 @@ float MyDuckClass::GetDuckHeading() {
     return result;
 }
 
-float MyDuckClass::angleToWaypoint (float waypointLatLonCur[2], float waypointLatLon[2]){
+double MyDuckClass::angleToWaypoint (double waypointLatLonCur[2], double waypointLatLon[2]){
     // Returns angle needed to get to waypoint
     // cordinates of current location
     float lat1, lon1;
@@ -244,7 +285,7 @@ float MyDuckClass::angleToWaypoint (float waypointLatLonCur[2], float waypointLa
 }
 
 
-float MyDuckClass::distanceToWaypoint(float waypointLatLonCur[2], float desiredpointLatLon[2]) {
+double MyDuckClass::distanceToWaypoint(double waypointLatLonCur[2], double desiredpointLatLon[2]) {
     float lat1, lon1;
     //cordintes of desitnation
     float lat2, lon2;

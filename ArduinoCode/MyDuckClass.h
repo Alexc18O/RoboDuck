@@ -1,6 +1,9 @@
 #ifndef MyDuckClass_h
 #define MyDuckClass_h
 #include "Arduino.h"
+#include <ESP32Servo.h>
+#include <TinyGPSPlus.h>
+#include <QMC5883LCompass.h>
 
 
 class MyDuckClass {
@@ -13,15 +16,15 @@ class MyDuckClass {
 
             void turnOffProppellor(int propellorSpeed, int propellorDirection);
             //Set direction of Propellor
-            void movePropHeading(int angleOfHeading);
+            void movePropHeading(Servo headingServo,double currentlat,double currentlong,double destinationlat,double desitnationlong,TinyGPSPlus gps1,QMC5883LCompass compass1);
             // Spot lock for duck
             void spotLock(float spotLockLocation[2]);
             //Get the current location of the duck
-            float * currentLocation();
+            void currentLocation();
             // Returns angle needed to get to waypoint
-            float angleToWaypoint (float waypointLatLonCur[2], float waypointLatLon[2]);
+            double angleToWaypoint (double waypointLatLonCur[2], double waypointLatLon[2]);
             //Get distance to specified waypoint
-            float distanceToWaypoint(float waypointLatLonCur[2], float desiredpointLatLon[2]);
+            double distanceToWaypoint(double waypointLatLonCur[2], double desiredpointLatLon[2]);
             //get heading from magnotometer
             float GetDuckHeading() ;
 

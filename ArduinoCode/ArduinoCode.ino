@@ -2,11 +2,14 @@
 //#include "Arduino.h”
 #include <WiFi.h>
 MyDuckClass roboDuck(27,14,25,26);
-
+double homeLat;
+double homeLong;
+float leftTopCorner[2] = {0, 0};
 // Replace with your network credentials
 const char* ssid = "ESP32-Access-Point";
 const char* password = "123456789";
-
+#include <TinyGPSPlus.h>
+TinyGPSPlus gps;
 // Set web server port number to 80
 WiFiServer server(80);
 
@@ -27,7 +30,6 @@ bool returnhome = false;
 
 void setup() {
     Serial.begin(115200);
-
     // Setting ESP32 as access point 
     Serial.print("Setting AP (Access Point)…");
     // Remove the password parameter, if you want the AP (Access Point) to be open
@@ -56,7 +58,7 @@ void setup() {
 void loop() {
   //roboDuck.movePropHeading(45);
   //roboDuck.movePropHeading(275);
-    WiFiClient client = server.available();   // Listen for incoming clients
+  WiFiClient client = server.available();   // Listen for incoming clients
 
   if (client) {                             // If a new client connects,
     currentTime = millis();
@@ -64,6 +66,14 @@ void loop() {
     Serial.println("New Client.");          // print a message out in the serial port
     String currentLine = "";                // make a String to hold incoming data from the client
     while (client.connected() && currentTime - previousTime <= timeoutTime) {  // loop while the client's connected
+        if (gps.encode(Serial2.read()))
+        {
+          if (gps.location.isValid()){
+            homeLat= (gps.location.lat());
+            homeLong = (gps.location.lng());
+            }
+          }
+          
       currentTime = millis();
       if (client.available()) {             // if there's bytes to read from the client,
         char c = client.read();             // read a byte, then
@@ -90,24 +100,84 @@ void loop() {
               spotlock = false;
               returnhome = false;
             } else if (header.indexOf("GET /waypoints") >= 0){
+                int headerLength = header.length();
+                String foo = header.substring(26, headerLength);
+                char chars[foo.length()];
+                foo.toCharArray(chars, foo.length());
+                Serial.println(foo);
+                int count = 0;
+                for(int i = 0; i < foo.length(); i++){
+                  if (foo[i] == ','){
+                    count++;
+                  }
+                }
+                int arrayLen = (count + 1) / 2;
+                Serial.println(count);
+                
+                const char *delimiter = ",";
+                char *token;
+                double currValue;
+                double waypointPercentValues [arrayLen];
+                token = strtok(chars, delimiter);
+                currValue = atof(token);
+                Serial.println(currValue);
+                waypointPercentValues[0] = currValue;
+                Serial.println("Index 0");
+                Serial.println(waypointPercentValues[0]);
+                int j = 1;
+                while (token != NULL) {
+                  if(j == arrayLen){
+                    break;
+                  }
+                  Serial.println(token);
+                  token=strtok(NULL, delimiter);
+                  
+                  currValue = atof(token);
+                  Serial.println(currValue);
+                  waypointPercentValues[j] = currValue;
+                  Serial.println(j);
+                  Serial.println(waypointPercentValues[j]);
+                  j++;
+                  // waypointPercentValues
+                }
                 Serial.println("waypoints");
                 waypoints = true;
                 Serial.println(waypoints);
                 calibrate = false;
                 spotlock = false;
                 returnhome = false;
+                int k;
+                for(k = 0; k < arrayLen; k += 2){
+                  double waypointGPSTargetLong = leftTopCorner[1] + (.0005 * waypointPercentValues[k]);
+                  double waypointGPSTargetLat = leftTopCorner[0] + (.0005 * waypointPercentValues[k+1]);
+                  Serial.println("New Long");
+                  Serial.println(waypointGPSTargetLong);
+                  Serial.println("New Lat");
+                  Serial.println(waypointGPSTargetLat);
+                }
+
+               
             } else if (header.indexOf("GET /spotlock") >= 0){
                 Serial.println("spotlock");
                 spotlock = true;
                 Serial.println(spotlock);
-            } else if (header.indexOf("GET /returnhome") >= 0){
+            } else if (header.indexOf("GET /sethome") >= 0){
                 Serial.println("returnhome");
                 returnhome = true;
                 Serial.println(returnhome);
+                homeLat = gps.location.lat();
+                homeLong = gps.location.lng();
+                float setHomeLat = homeLat;
+                float setHomeLong = homeLong; 
                 calibrate = false;
                 waypoints = false;
                 spotlock = false;
+                leftTopCorner[0] = setHomeLat + .00005;
+                leftTopCorner[1] = setHomeLong - .00005;
             }
+
+
+
             
             // Display the HTML web page
             client.println("<!DOCTYPE html><html>");
@@ -123,7 +193,7 @@ void loop() {
             // Web Page Heading
             client.println("<body><h1>Robo Duck</h1>");
             client.println("<center><div id='grid' style='width:80%; border:5px solid black;'><button style='background-color:red;' onclick='resetWaypoints()'>Reset Waypoints</button><button>Waypoints Left: <div id='numWaypoints'>10</div></button><canvas id='canvas' style='height:100%; width:100%; background-color:white;' /></div></center>");
-            client.println("<div style='display:grid; grid-template-rows: 2fr 2fr; grid-template-columns: 2fr 2fr;'><a href='/calibrate'><button class='button'>Calibrate</button></a><a href='/waypoints'><button class='button'>Waypoints</button></a><a href='/spotlock'><button class='button'>Spot Lock</button></a><a href='/returnhome'><button class='button'>Return Home</button></a></div>"); 
+            client.println("<div style='display:grid; grid-template-rows: 2fr 2fr; grid-template-columns: 2fr 2fr;'><a href='/calibrate'><button class='button'>Calibrate</button></a><a href='/waypoints/' onclick=\"location.href=this.href+'?waypoints='+waypoints;return false;\"><button class='button'>Waypoints</button></a><a href='/spotlock'><button class='button'>Spot Lock</button></a><a href='/sethome'><button class='button'>Set Home</button></a></div>"); 
 
             client.println("</body></html>");
             client.println("<script type='text/javascript'> \ 
@@ -170,13 +240,17 @@ void loop() {
                   var trueY = absY - y;\
                   console.log('trueX: ' + trueX + ' trueY: ' + trueY);\
                   console.log('percentX: ' + (trueX / width) + ' percentY: ' + (trueY / height));\ 
-                  drawWaypoint(trueX, trueY);\      
+                  var canvasWidth = document.getElementById('grid').getBoundingClientRect().width;\
+                  var canvasHeight = document.getElementById('grid').getBoundingClientRect().height;\
+                  var trueWaypointXPct = (trueX / canvasWidth);\
+                  var trueWaypointYPct = (trueY / canvasHeight);\
+                  drawWaypoint(trueX, trueY, trueWaypointXPct, trueWaypointYPct);\      
                 }\
-                function drawWaypoint(x, y){\
+                function drawWaypoint(x, y, trueWaypointXPct, trueWaypointYPct){\
                   var canvas = document.getElementById('canvas');\
                   var ctx = canvas.getContext('2d');\
                   ctx.beginPath();\
-                  waypoints.push([x,y]);\
+                  waypoints.push([trueWaypointXPct,trueWaypointYPct]);\
                   console.log(waypoints);\
                   var drawWaypoint = decrementWaypoints();\
                   if (drawWaypoint){\

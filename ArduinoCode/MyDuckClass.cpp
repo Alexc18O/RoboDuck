@@ -164,18 +164,18 @@ void MyDuckClass::movePropHeading(Servo headingServo,double currentlat,double cu
               compass1.read();
               //Angle of heading based on Magnotometer
               angleMag = compass1 .getAzimuth();
-              
+              // the two values should be from waypoint values
              angleOfHeading = gps1.courseTo(gps1.location.lat(),gps1.location.lng(),44.14774,-93.99575);
-              headingServo.write(angleOfHeading-100);
+              headingServo.write(angleOfHeading-75+angleMag);
             Serial.println(angleOfHeading-100);
             Serial.println(gps1.distanceBetween( gps1.location.lat(),gps1.location.lng(),44.14774,-93.99575));
             //delay(1000);
             }
           }
           
-          //if(distanceToWaypoint(currentLocation,destinationLocation) < 4){
-            //break;
-        //}
+          if(distanceToWaypoint(currentLocation,destinationLocation) < 4){
+            break;
+        }
       
     
 }
